@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Banderas del Mundo (Offline)</title>
+    <style>
+        :root {
+            /* Tema Oscuro */
+            --bg-color: #121212;
+            --text-color: #e2e8f0;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --card-bg: #1e293b;
+            --input-bg: #0f172a;
+            --input-border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 { margin-bottom: 5px; color: #f8fafc; }
+        p.subtitle { color: #94a3b8; margin-bottom: 30px; }
+        
+        /* Contenedores */
+        #menu-screen, #game-screen, #end-screen {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
+            max-width: 500px;
+            width: 100%;
+        }
+        #game-screen, #end-screen { display: none; }
+
+        /* Botones del menú */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        /* Centrar Oceanía en su propia fila con el mismo tamaño */
+        .btn-oceania {
+            grid-column: span 2;
+            justify-self: center;
+            width: calc(50% - 7.5px);
+        }
+        .btn-world {
+            grid-column: span 2;
+            background-color: #10b981 !important;
+        }
+        .btn-world:hover { background-color: #059669 !important; }
+        
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        button:hover { background-color: var(--primary-hover); }
+        button:active { transform: scale(0.98); }
+        
+        .btn-reset {
+            background-color: transparent;
+            color: #ef4444;
+            border: 1px solid #ef4444;
+            margin-top: 25px;
+            padding: 8px 15px;
+            font-size: 13px;
+        }
+        .btn-reset:hover {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        /* Área de juego */
+        .progress-bar {
+            font-size: 14px;
+            font-weight: bold;
+            color: #94a3b8;
+            margin-bottom: 15px;
+        }
+        img#flag-image {
+            width: 100%;
+            max-width: 320px;
+            height: auto;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        input[type="text"] {
+            width: 80%;
+            padding: 12px;
+            font-size: 18px;
+            background-color: var(--input-bg);
+            color: white;
+            border: 2px solid var(--input-border);
+            border-radius: 8px;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus { border-color: var(--primary); }
+        input[type="text"]:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .error-animation { animation: shake 0.4s; border-color: #ef4444 !important; }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        #feedback {
+            height: 24px;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #ef4444;
+            font-size: 18px;
+        }
+        .controls { margin-top: 20px; display: flex; justify-content: space-between; }
+        .btn-skip { background-color: #f59e0b; }
+        .btn-skip:hover { background-color: #d97706; }
+        .btn-quit { background-color: #ef4444; }
+        .btn-quit:hover { background-color: #dc2626; }
+        .btn-continue { background-color: #10b981; width: 100%; }
+        .btn-continue:hover { background-color: #059669; }
+
+        /* Estilos del tiempo */
+        .time-stats {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-top: 15px;
+            background-color: var(--input-bg);
+            padding: 12px;
+            border-radius: 8px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🌎 Maestro de Banderas</h1>
+    <p class="subtitle">Escribe el nombre correcto. No importan los acentos.</p>
+
+    <!-- PANTALLA DE MENÚ -->
+    <div id="menu-screen">
+        <h2>Elige una región</h2>
+        <div class="btn-grid">
+            <button onclick="startGame('América')">América</button>
+            <button onclick="startGame('Europa')">Europa</button>
+            <button onclick="startGame('Asia')">Asia</button>
+            <button onclick="startGame('África')">África</button>
+            <button class="btn-oceania" onclick="startGame('Oceanía')">Oceanía</button>
+            <button class="btn-world" onclick="startGame('Mundo')">🌍 Mundo (50 banderas)</button>
+        </div>
+        <button class="btn-reset" onclick="resetRecords()">🗑️ Borrar Tiempos Guardados</button>
+    </div>
+
+    <!-- PANTALLA DE JUEGO -->
+    <div id="game-screen">
+        <div class="progress-bar" id="progress-text">1 de 35</div>
+        <img id="flag-image" src="" alt="Bandera">
+        <br>
+        <input type="text" id="answer-input" placeholder="Escribe el país y presiona Enter" autocomplete="off">
+        <div id="feedback"></div>
+        
+        <!-- Controles normales -->
+        <div class="controls" id="normal-controls">
+            <button class="btn-quit" onclick="showMenu()">Salir</button>
+            <button class="btn-skip" onclick="skipFlag()">No me la sé</button>
+        </div>
+
+        <!-- Control de continuar (oculto por defecto) -->
+        <div class="controls" id="continue-controls" style="display: none;">
+            <button class="btn-continue" onclick="nextFlag()">Continuar ➡️</button>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE RESULTADOS -->
+    <div id="end-screen">
+        <h2>¡Juego Terminado! 🎉</h2>
+        <p>Has completado el reto de <span id="end-region" style="font-weight: bold; color: var(--primary);"></span>.</p>
+        <p>Aciertos a la primera: <strong id="score-text" style="font-size: 24px;"></strong></p>
+        
+        <!-- Estadísticas de tiempo -->
+        <div class="time-stats" id="time-display"></div>
+
+        <button onclick="showMenu()" style="margin-top: 20px; width: 100%;">Volver al Menú</button>
+    </div>
+
+    <script>
+        // BASE DE DATOS COMPLETA DE TODOS LOS PAÍSES
+        const countries = [
+            // ================= AMÉRICA (35) =================
+            { code: "ag", names: ["Antigua y Barbuda"], continent: "América" },
+            { code: "ar", names: ["Argentina"], continent: "América" },
+            { code: "bs", names: ["Bahamas", "Las Bahamas"], continent: "América" },
+            { code: "bb", names: ["Barbados"], continent: "América" },
+            { code: "bz", names: ["Belice"], continent: "América" },
+            { code: "bo", names: ["Bolivia"], continent: "América" },
+            { code: "br", names: ["Brasil"], continent: "América" },
+            { code: "ca", names: ["Canada"], continent: "América" },
+            { code: "cl", names: ["Chile"], continent: "América" },
+            { code: "co", names: ["Colombia"], continent: "América" },
+            { code: "cr", names: ["Costa Rica"], continent: "América" },
+            { code: "cu", names: ["Cuba"], continent: "América" },
+            { code: "dm", names: ["Dominica"], continent: "América" },
+            { code: "ec", names: ["Ecuador"], continent: "América" },
+            { code: "sv", names: ["El Salvador"], continent: "América" },
+            { code: "us", names: ["Estados Unidos", "EEUU", "USA"], continent: "América" },
+            { code: "gd", names: ["Granada"], continent: "América" },
+            { code: "gt", names: ["Guatemala"], continent: "América" },
+            { code: "gy", names: ["Guyana"], continent: "América" },
+            { code: "ht", names: ["Haiti"], continent: "América" },
+            { code: "hn", names: ["Honduras"], continent: "América" },
+            { code: "jm", names: ["Jamaica"], continent: "América" },
+            { code: "mx", names: ["Mexico"], continent: "América" },
+            { code: "ni", names: ["Nicaragua"], continent: "América" },
+            { code: "pa", names: ["Panama"], continent: "América" },
+            { code: "py", names: ["Paraguay"], continent: "América" },
+            { code: "pe", names: ["Peru"], continent: "América" },
+            { code: "do", names: ["Republica Dominicana"], continent: "América" },
+            { code: "kn", names: ["San Cristobal y Nieves"], continent: "América" },
+            { code: "vc", names: ["San Vicente y las Granadinas", "San Vicente"], continent: "América" },
+            { code: "lc", names: ["Santa Lucia"], continent: "América" },
+            { code: "sr", names: ["Surinam"], continent: "América" },
+            { code: "tt", names: ["Trinidad y Tobago"], continent: "América" },
+            { code: "uy", names: ["Uruguay"], continent: "América" },
+            { code: "ve", names: ["Venezuela"], continent: "América" },
+
+            // ================= EUROPA (46) =================
+            { code: "al", names: ["Albania"], continent: "Europa" },
+            { code: "de", names: ["Alemania"], continent: "Europa" },
+            { code: "ad", names: ["Andorra"], continent: "Europa" },
+            { code: "at", names: ["Austria"], continent: "Europa" },
+            { code: "be", names: ["Belgica"], continent: "Europa" },
+            { code: "by", names: ["Bielorrusia"], continent: "Europa" },
+            { code: "ba", names: ["Bosnia y Herzegovina", "Bosnia"], continent: "Europa" },
+            { code: "bg", names: ["Bulgaria"], continent: "Europa" },
+            { code: "cy", names: ["Chipre"], continent: "Europa" },
+            { code: "hr", names: ["Croacia"], continent: "Europa" },
+            { code: "dk", names: ["Dinamarca"], continent: "Europa" },
+            { code: "sk", names: ["Eslovaquia"], continent: "Europa" },
+            { code: "si", names: ["Eslovenia"], continent: "Europa" },
+            { code: "es", names: ["España"], continent: "Europa" },
+            { code: "ee", names: ["Estonia"], continent: "Europa" },
+            { code: "fi", names: ["Finlandia"], continent: "Europa" },
+            { code: "fr", names: ["Francia"], continent: "Europa" },
+            { code: "gr", names: ["Grecia"], continent: "Europa" },
+            { code: "hu", names: ["Hungria"], continent: "Europa" },
+            { code: "ie", names: ["Irlanda"], continent: "Europa" },
+            { code: "is", names: ["Islandia"], continent: "Europa" },
+            { code: "it", names: ["Italia"], continent: "Europa" },
+            { code: "xk", names: ["Kosovo"], continent: "Europa" },
+            { code: "lv", names: ["Letonia"], continent: "Europa" },
+            { code: "li", names: ["Liechtenstein"], continent: "Europa" },
+            { code: "lt", names: ["Lituania"], continent: "Europa" },
+            { code: "lu", names: ["Luxemburgo"], continent: "Europa" },
+            { code: "mk", names: ["Macedonia del Norte", "Macedonia"], continent: "Europa" },
+            { code: "mt", names: ["Malta"], continent: "Europa" },
+            { code: "md", names: ["Moldavia"], continent: "Europa" },
+            { code: "mc", names: ["Monaco"], continent: "Europa" },
+            { code: "me", names: ["Montenegro"], continent: "Europa" },
+            { code: "no", names: ["Noruega"], continent: "Europa" },
+            { code: "nl", names: ["Paises Bajos", "Holanda"], continent: "Europa" },
+            { code: "pl", names: ["Polonia"], continent: "Europa" },
+            { code: "pt", names: ["Portugal"], continent: "Europa" },
+            { code: "gb", names: ["Reino Unido", "Inglaterra", "Gran Bretaña"], continent: "Europa" },
+            { code: "cz", names: ["Republica Checa", "Chequia"], continent: "Europa" },
+            { code: "ro", names: ["Rumania"], continent: "Europa" },
+            { code: "ru", names: ["Rusia"], continent: "Europa" },
+            { code: "sm", names: ["San Marino"], continent: "Europa" },
+            { code: "rs", names: ["Serbia"], continent: "Europa" },
+            { code: "se", names: ["Suecia"], continent: "Europa" },
+            { code: "ch", names: ["Suiza"], continent: "Europa" },
+            { code: "ua", names: ["Ucrania"], continent: "Europa" },
+            { code: "va", names: ["Vaticano", "Ciudad del Vaticano"], continent: "Europa" },
+
+            // ================= ASIA (49) =================
+            { code: "af", names: ["Afganistan"], continent: "Asia" },
+            { code: "sa", names: ["Arabia Saudita", "Arabia Saudi"], continent: "Asia" },
+            { code: "am", names: ["Armenia"], continent: "Asia" },
+            { code: "az", names: ["Azerbaiyan"], continent: "Asia" },
+            { code: "bd", names: ["Bangladesh"], continent: "Asia" },
+            { code: "bh", names: ["Barein", "Bahrein"], continent: "Asia" },
+            { code: "bn", names: ["Brunei"], continent: "Asia" },
+            { code: "bt", names: ["Butan"], continent: "Asia" },
+            { code: "kh", names: ["Camboya"], continent: "Asia" },
+            { code: "qa", names: ["Qatar", "Catar"], continent: "Asia" },
+            { code: "cn", names: ["China"], continent: "Asia" },
+            { code: "kp", names: ["Corea del Norte"], continent: "Asia" },
+            { code: "kr", names: ["Corea del Sur"], continent: "Asia" },
+            { code: "ae", names: ["Emiratos Arabes Unidos", "Emiratos Arabes"], continent: "Asia" },
+            { code: "ph", names: ["Filipinas"], continent: "Asia" },
+            { code: "ge", names: ["Georgia"], continent: "Asia" },
+            { code: "in", names: ["India"], continent: "Asia" },
+            { code: "id", names: ["Indonesia"], continent: "Asia" },
+            { code: "iq", names: ["Irak", "Iraq"], continent: "Asia" },
+            { code: "ir", names: ["Iran"], continent: "Asia" },
+            { code: "il", names: ["Israel"], continent: "Asia" },
+            { code: "jp", names: ["Japon"], continent: "Asia" },
+            { code: "jo", names: ["Jordania"], continent: "Asia" },
+            { code: "kz", names: ["Kazajistan", "Kazajstan"], continent: "Asia" },
+            { code: "kg", names: ["Kirguistan"], continent: "Asia" },
+            { code: "kw", names: ["Kuwait"], continent: "Asia" },
+            { code: "la", names: ["Laos"], continent: "Asia" },
+            { code: "lb", names: ["Libano"], continent: "Asia" },
+            { code: "my", names: ["Malasia"], continent: "Asia" },
+            { code: "mv", names: ["Maldivas"], continent: "Asia" },
+            { code: "mn", names: ["Mongolia"], continent: "Asia" },
+            { code: "mm", names: ["Myanmar", "Birmania"], continent: "Asia" },
+            { code: "np", names: ["Nepal"], continent: "Asia" },
+            { code: "om", names: ["Oman"], continent: "Asia" },
+            { code: "pk", names: ["Pakistan"], continent: "Asia" },
+            { code: "ps", names: ["Palestina"], continent: "Asia" },
+            { code: "ru", names: ["Rusia"], continent: "Asia" },
+            { code: "sg", names: ["Singapur"], continent: "Asia" },
+            { code: "sy", names: ["Siria"], continent: "Asia" },
+            { code: "lk", names: ["Sri Lanka"], continent: "Asia" },
+            { code: "th", names: ["Tailandia"], continent: "Asia" },
+            { code: "tw", names: ["Taiwan"], continent: "Asia" },
+            { code: "tj", names: ["Tayikistan"], continent: "Asia" },
+            { code: "tl", names: ["Timor Oriental", "Timor-Leste"], continent: "Asia" },
+            { code: "tm", names: ["Turkmenistan"], continent: "Asia" },
+            { code: "tr", names: ["Turquia"], continent: "Asia" },
+            { code: "uz", names: ["Uzbekistan"], continent: "Asia" },
+            { code: "vn", names: ["Vietnam"], continent: "Asia" },
+            { code: "ye", names: ["Yemen"], continent: "Asia" },
+
+            // ================= ÁFRICA (54) =================
+            { code: "ao", names: ["Angola"], continent: "África" },
+            { code: "dz", names: ["Argelia"], continent: "África" },
+            { code: "bj", names: ["Benin"], continent: "África" },
+            { code: "bw", names: ["Botsuana"], continent: "África" },
+            { code: "bf", names: ["Burkina Faso"], continent: "África" },
+            { code: "bi", names: ["Burundi"], continent: "África" },
+            { code: "cv", names: ["Cabo Verde"], continent: "África" },
+            { code: "cm", names: ["Camerun"], continent: "África" },
+            { code: "td", names: ["Chad"], continent: "África" },
+            { code: "km", names: ["Comoras"], continent: "África" },
+            { code: "cg", names: ["Congo", "Republica del Congo"], continent: "África" },
+            { code: "cd", names: ["Republica Democratica del Congo", "RD Congo"], continent: "África" },
+            { code: "ci", names: ["Costa de Marfil"], continent: "África" },
+            { code: "eg", names: ["Egipto"], continent: "África" },
+            { code: "er", names: ["Eritrea"], continent: "África" },
+            { code: "sz", names: ["Esuatini", "Suazilandia"], continent: "África" },
+            { code: "et", names: ["Etiopia"], continent: "África" },
+            { code: "ga", names: ["Gabon"], continent: "África" },
+            { code: "gm", names: ["Gambia"], continent: "África" },
+            { code: "gh", names: ["Ghana"], continent: "África" },
+            { code: "gn", names: ["Guinea"], continent: "África" },
+            { code: "gw", names: ["Guinea-Bisau", "Guinea Bisau"], continent: "África" },
+            { code: "gq", names: ["Guinea Ecuatorial"], continent: "África" },
+            { code: "ke", names: ["Kenia", "Kenya"], continent: "África" },
+            { code: "ls", names: ["Lesoto"], continent: "África" },
+            { code: "lr", names: ["Liberia"], continent: "África" },
+            { code: "ly", names: ["Libia"], continent: "África" },
+            { code: "mg", names: ["Madagascar"], continent: "África" },
+            { code: "mw", names: ["Malaui", "Malawi"], continent: "África" },
+            { code: "ml", names: ["Mali"], continent: "África" },
+            { code: "ma", names: ["Marruecos"], continent: "África" },
+            { code: "mu", names: ["Mauricio"], continent: "África" },
+            { code: "mr", names: ["Mauritania"], continent: "África" },
+            { code: "mz", names: ["Mozambique"], continent: "África" },
+            { code: "na", names: ["Namibia"], continent: "África" },
+            { code: "ne", names: ["Niger"], continent: "África" },
+            { code: "ng", names: ["Nigeria"], continent: "África" },
+            { code: "cf", names: ["Republica Centroafricana"], continent: "África" },
+            { code: "rw", names: ["Ruanda"], continent: "África" },
+            { code: "st", names: ["Santo Tome y Principe"], continent: "África" },
+            { code: "sn", names: ["Senegal"], continent: "África" },
+            { code: "sc", names: ["Seychelles"], continent: "África" },
+            { code: "sl", names: ["Sierra Leona"], continent: "África" },
+            { code: "so", names: ["Somalia"], continent: "África" },
+            { code: "za", names: ["Sudafrica"], continent: "África" },
+            { code: "sd", names: ["Sudan"], continent: "África" },
+            { code: "ss", names: ["Sudan del Sur"], continent: "África" },
+            { code: "tz", names: ["Tanzania"], continent: "África" },
+            { code: "tg", names: ["Togo"], continent: "África" },
+            { code: "tn", names: ["Tunez"], continent: "África" },
+            { code: "ug", names: ["Uganda"], continent: "África" },
+            { code: "dj", names: ["Yibuti"], continent: "África" },
+            { code: "zm", names: ["Zambia"], continent: "África" },
+            { code: "zw", names: ["Zimbabue", "Zimbabwe"], continent: "África" },
+
+            // ================= OCEANÍA (14) =================
+            { code: "au", names: ["Australia"], continent: "Oceanía" },
+            { code: "fj", names: ["Fiyi", "Fiji"], continent: "Oceanía" },
+            { code: "ki", names: ["Kiribati"], continent: "Oceanía" },
+            { code: "mh", names: ["Islas Marshall", "Marshall"], continent: "Oceanía" },
+            { code: "fm", names: ["Micronesia"], continent: "Oceanía" },
+            { code: "nr", names: ["Nauru"], continent: "Oceanía" },
+            { code: "nz", names: ["Nueva Zelanda", "Nueva Zelandia"], continent: "Oceanía" },
+            { code: "pw", names: ["Palaos"], continent: "Oceanía" },
+            { code: "pg", names: ["Papua Nueva Guinea"], continent: "Oceanía" },
+            { code: "ws", names: ["Samoa"], continent: "Oceanía" },
+            { code: "sb", names: ["Islas Salomon", "Salomon"], continent: "Oceanía" },
+            { code: "to", names: ["Tonga"], continent: "Oceanía" },
+            { code: "tv", names: ["Tuvalu"], continent: "Oceanía" },
+            { code: "vu", names: ["Vanuatu"], continent: "Oceanía" }
+        ];
+
+        let currentPlaylist = [];
+        let currentIndex = 0;
+        let score = 0;
+        let currentRegion = "";
+        let startTime = 0;
+
+        // NORMALIZAR TEXTO
+        function normalizeText(text) {
+            return text
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/&/g, "y")
+                .trim();
+        }
+
+        // DESORDENAR ARREGLO
+        function shuffleArray(array) {
+            let arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        // FORMATEAR TIEMPO (ej. 125s -> "02:05")
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // INICIAR JUEGO
+        function startGame(region) {
+            currentRegion = region;
+            
+            if (region === 'Mundo') {
+                currentPlaylist = shuffleArray(countries).slice(0, 50);
+            } else {
+                let filtered = countries.filter(c => c.continent === region);
+                currentPlaylist = shuffleArray(filtered);
+            }
+
+            currentIndex = 0;
+            score = 0;
+            startTime = Date.now();
+            
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            
+            loadFlag();
+        }
+
+        // CARGAR BANDERA (AHORA MODIFICADO PARA MODO OFFLINE)
+        function loadFlag() {
+            if (currentIndex >= currentPlaylist.length) {
+                endGame();
+                return;
+            }
+
+            const country = currentPlaylist[currentIndex];
+            
+            // 👉 ESTA ES LA LÍNEA QUE CAMBIÓ: AHORA BUSCA LA CARPETA LOCAL "banderas" 👈
+            document.getElementById('flag-image').src = `banderas/${country.code}.png`;
+            
+            // En caso de que la imagen no cargue (por un error de nombre), mostramos un texto alternativo
+            document.getElementById('flag-image').alt = `Bandera de ${country.code}`;
+            
+            document.getElementById('progress-text').innerText = `${currentIndex + 1} de ${currentPlaylist.length}`;
+            
+            const input = document.getElementById('answer-input');
+            input.value = '';
+            input.disabled = false;
+            input.focus();
+            
+            document.getElementById('feedback').innerText = '';
+            document.getElementById('normal-controls').style.display = 'flex';
+            document.getElementById('continue-controls').style.display = 'none';
+        }
+
+        // SALTAR BANDERA
+        function skipFlag() {
+            const country = currentPlaylist[currentIndex];
+            const feedback = document.getElementById('feedback');
+            
+            feedback.style.color = '#f59e0b';
+            feedback.innerText = `Era: ${country.names[0]}`;
+            
+            document.getElementById('answer-input').disabled = true;
+            document.getElementById('normal-controls').style.display = 'none';
+            document.getElementById('continue-controls').style.display = 'flex';
+        }
+
+        // CONTINUAR DESPUÉS DE SALTAR
+        function nextFlag() {
+            currentIndex++;
+            loadFlag();
+        }
+
+        // MOSTRAR MENÚ PRINCIPAL
+        function showMenu() {
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('menu-screen').style.display = 'block';
+        }
+
+        // TERMINAR JUEGO Y CALCULAR TIEMPOS
+        function endGame() {
+            const endTime = Date.now();
+            const timeTakenSec = Math.floor((endTime - startTime) / 1000);
+            const isPerfect = (score === currentPlaylist.length);
+            
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'block';
+            document.getElementById('end-region').innerText = currentRegion;
+            document.getElementById('score-text').innerText = `${score} de ${currentPlaylist.length}`;
+
+            const storageKey = `bestTime_${currentRegion}`;
+            let bestTimeSec = localStorage.getItem(storageKey);
+            let isNewRecord = false;
+
+            // Guardar récord si es puntaje perfecto
+            if (isPerfect) {
+                if (!bestTimeSec || timeTakenSec < parseInt(bestTimeSec)) {
+                    localStorage.setItem(storageKey, timeTakenSec);
+                    bestTimeSec = timeTakenSec;
+                    isNewRecord = true;
+                }
+            }
+
+            // Construir el mensaje explicativo
+            const timeDisplay = document.getElementById('time-display');
+            let statusText = "";
+
+            if (isPerfect) {
+                statusText = `<br>Mejor tiempo perfecto (${currentRegion}): <strong style="color: #10b981;">${formatTime(bestTimeSec)}</strong> ${isNewRecord ? '🎉 ¡Nuevo récord!' : ''}`;
+            } else {
+                if (bestTimeSec) {
+                    statusText = `<br>Mejor tiempo registrado: <strong style="color: #10b981;">${formatTime(bestTimeSec)}</strong>`;
+                }
+                statusText += `<br><span style="color: #ef4444; font-size: 13px; font-weight: bold;">⚠️ Necesitas 100% de aciertos para registrar o actualizar tu récord.</span>`;
+            }
+
+            timeDisplay.innerHTML = `Tiempo total: <strong style="color: white;">${formatTime(timeTakenSec)}</strong>${statusText}`;
+        }
+
+        // REINICIAR/BORRAR RÉCORDS
+        function resetRecords() {
+            if (confirm("¿Estás seguro de que quieres borrar todos tus mejores tiempos guardados?")) {
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('bestTime_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                alert("¡Todos los tiempos han sido borrados con éxito!");
+            }
+        }
+
+        // REVISAR RESPUESTA AL PRESIONAR ENTER
+        document.getElementById('answer-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !this.disabled) {
+                const userInput = normalizeText(this.value);
+                const country = currentPlaylist[currentIndex];
+                
+                const isCorrect = country.names.some(name => normalizeText(name) === userInput);
+
+                if (isCorrect) {
+                    score++;
+                    currentIndex++;
+                    loadFlag();
+                } else {
+                    this.classList.remove('error-animation');
+                    void this.offsetWidth;
+                    this.classList.add('error-animation');
+                    
+                    const feedback = document.getElementById('feedback');
+                    feedback.style.color = '#ef4444';
+                    feedback.innerText = 'Incorrecto, intenta de nuevo.';
+                    
+                    setTimeout(() => {
+                        if(feedback.style.color === 'rgb(239, 68, 68)') {
+                            feedback.innerText = '';
+                        }
+                        this.classList.remove('error-animation');
+                    }, 1500);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
